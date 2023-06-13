@@ -1,0 +1,221 @@
+/* Popup : partie caracteristique de l'aac */
+.caracteristique {
+    border-radius: 0.2em;
+    color: white;
+    background-color: #d6970a;
+    text-align: center;
+    padding: 1em;
+}
+
+/* Popup : partie demarches */
+.demarche {
+    border-radius: 0.2em;
+    color: white;
+    background-color: #576b35;
+    text-align: center;
+    padding: 1em;
+}
+
+/* Popup : partie qualites */
+.qualite {
+    border-radius: 0.2em;
+    color: white;
+    background-color:#0c4e67;
+    text-align: center;
+    padding: 1em;
+}
+
+/* Popup : partie pour aller plus loin */
+.plus_loin {
+  border-radius: 0.2em;
+  color: white;
+  background-color: #ca1823;
+  text-align: center;
+  padding: 1em;
+}
+
+/* Popup : nom de l'ouvrage en titre */
+.nom_ouvrage {
+    font-size : 2em;
+    color: rgb(74,74,74);
+    text-align: center;
+}
+
+/* Popup : mot OUVRAGE */
+.ouvrage {
+    text-align: center;
+    font-size : 1em;
+    color: rgb(173, 173, 173);
+    padding: 0;
+    margin: 0;
+}
+
+/* Popup : catégorie */
+.categorie {
+    font-size : 1em;
+    color: rgb(173, 173, 173);
+}
+
+/* Popup : élément */
+.element {
+    font-size : 1em;
+    color: black;
+}
+
+
+.loader{
+    margin:auto;
+    margin-top: 100px;
+    margin-bottom: 100px;
+    border: 7px solid #bdc3c7;
+    width: 40px;
+    height: 40px;
+    border-top-color: #0c4e67;
+    border-bottom-color: #0c4e67;
+    border-radius: 50%;
+    animation: chargeur 4s linear infinite;
+}
+
+/* Icône de changement initial */
+@keyframes chargeur {
+    0%{
+        transform: rotate(0deg) scale(1);
+        border-top-color: #d6970a;
+        border-bottom-color: #d6970a;
+    }
+    25%{
+        border-top-color: #0c4e67;
+        border-bottom-color: #0c4e67;
+    }
+    50% {
+        transform: rotate(360deg) scale(1);
+        border-top-color: #d6970a;
+        border-bottom-color: #d6970a;
+    }
+    75%{
+        border-top-color: #0c4e67;
+        border-bottom-color: #0c4e67;
+    }
+    100%{
+        transform: rotate(720deg) scale(1);
+        border-top-color: #d6970a;
+        border-bottom-color: #d6970a;
+    }
+}
+
+
+body {
+    position: relative;
+    justify-content: center;
+    flex-direction: column;
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  #export {
+    position: absolute;
+    right: 10px;
+    z-index: 99999;
+    background: white;
+    color: black;
+    padding: 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    text-decoration: none;
+  }
+  
+  #export {
+    top: 10px;
+  }
+  
+
+.captage {
+    height: 50%;
+  }
+
+.autocomplete {
+    background: #fff;
+    height: 29vh;
+    width: 98%;
+    padding: 15px 20px;
+    overflow: hidden;
+  }
+
+.search-shop {
+  border: 1px solid #d7d7d7;
+  box-shadow: none;
+  box-sizing: border-box;
+  font-size: 16px;
+  padding: 8px 10px;
+  margin-bottom: 20px;
+  border-top: 1px solid #cccccc;
+  width: 100%;
+}
+
+.search-shop:focus {
+  border: 1px solid #858585;
+  outline: none;
+}
+
+.aac_liste {
+    margin: 0;
+    padding: 0 10px 0 0;
+    list-style: none;
+    height: calc(100% - 60px);
+    overflow: auto;
+    font-family: Arial;
+  }
+  
+  .aac_liste::-webkit-scrollbar {
+    width: 10px;
+  }
+  .aac_liste::-webkit-scrollbar-thumb {
+    background-color: #007c8e;
+    border-radius: 5px;
+  }
+  
+  .aac_item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 10px 10px 5px;
+    font-size: 80%;
+    border-bottom: 1px solid #cccccc;
+    cursor: pointer;
+  }
+  
+  .aac_item:hover {
+    background: #f3f3f3;
+  }
+  
+  
+  .departement {
+    text-transform: uppercase;
+    font-weight: bold;
+    margin-top: 20px;
+    margin-bottom: 5px;
+    padding-left: 3px;
+    font-size: 90%;
+    color: #d6970a;
+  }
+  
+  
+  .active-shop {
+    background: #007c8e !important;
+    color: #fff;
+  }
+
+
+  /*  Style page HTML - OBLIGATOIRE */
+
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+
+#map { float: left; width : 100%; height: 70vh;}
+.info { padding: 6px 8px; font: 14px/16px Arial, Helvetica, sans-serif; background: white; background: rgba(255,255,255,0.8); box-shadow: 0 0 15px rgba(0,0,0,0.2); border-radius: 5px; } .info h4 { margin: 0 0 5px; color: #777; }
+.legend { text-align: left; line-height: 25px; color: #555; } .legend i { width: 18px; height: 18px; float: left; margin-right: 8px; opacity: 0.7; }

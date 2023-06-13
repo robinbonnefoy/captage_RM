@@ -1,0 +1,583 @@
+<!-- Carte Captage avec navigation des AAC avec un panneau latérale 
+	Inspiration de https://tomik23.github.io/leaflet-examples/#52.full-project -->
+
+<!doctype html>
+<html lang="fr">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="author" content="Robin BONNEFOY">
+	<meta name="description" content="Maquette cartographie web captage">
+
+
+	<title>Carte captage bassin Rhône Méditerranée Corse </title>
+  
+	<!-- Ressources Leaflet -->
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.2/dist/leaflet.css"
+		integrity="sha256-sA+zWATbFveLLNqWO2gtiw3HL/lh1giY/Inf1BJ0z14="
+		crossorigin=""/>
+	<!-- Make sure you put this AFTER Leaflet's CSS -->
+	<script src="https://unpkg.com/leaflet@1.9.2/dist/leaflet.js"
+		integrity="sha256-o9N1jGDZrf5tS+Ft4gbIK7mYMipq9lqpVJ91xHSyKhg="
+		crossorigin=""></script>
+
+    <!-- Bibliothèque JQuery -->
+	<script src="https://code.jquery.com/jquery-3.5.0.js"></script>
+
+    <!-- Plugin mettre la carte en plein écran https://github.com/Leaflet/Leaflet.fullscreen -->
+	<script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
+	<link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/leaflet.fullscreen.css' rel='stylesheet' />
+
+    <!-- Plugin pour le controle avancé des couches https://github.com/ismyrnow/leaflet-groupedlayercontrol -->
+    <!-- 
+	<script src="js/leaflet-groupedlayercontrol.js"></script>
+    <link rel="stylesheet" href="css/leaflet-groupedlayercontrol.css" />
+	-->
+
+    <!-- Récupération de toutes les entites supperposees une même couche -->
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+    <!-- Onglet Popup https://github.com/cferdinandi/tabby -->
+    <link rel="stylesheet" type="text/css" href="css/tabby-ui.css">
+    <script src="js/tabby.polyfills.js"></script>
+
+	<!-- Import du style css maison -->
+	<link rel="stylesheet" type="text/css" href="css/carte.css">
+
+    <!-- Autocomplétion sur plusieurs champs-->
+    <script src="https://cdn.jsdelivr.net/npm/autocomplete.js@0.38.0/dist/autocomplete.min.js"></script>
+
+</head>
+
+<body>
+
+	<!-- Conteneurs HTML -->
+
+	<!-- Icone de chargement -->
+	<div id="icone_chargement" class="loader"></div>
+
+	<!-- Carte + liste aac + navigation --> 
+	<div id="captage">
+		<div id="map"></div><!-- Conteneur de la carte -->
+		<div class="autocomplete">
+			<input
+			  id="search-shop"
+			  class="search-shop"
+			  type="text"
+			  placeholder="Rechercher une AAC ..."
+			/> <!-- Barre de recherche -->
+			<ul class="aac_liste"></ul> <!-- Liste des aac -->
+		</div>
+	</div>
+
+	<!-- Code Javascript de la carte Leaflet -->
+    <script>
+		
+        // Vérification que la bibliothèque JQuery est bien chargée
+		$(document).ready(function () {
+
+			// Efface l'icone de chargement une fois la carte chargée
+			function chargement_carte () {
+				setTimeout( function(){$('#icone_chargement').hide()}, 3000);               
+			};
+    
+            // ------------------------------------------------------------------------------------------------------------
+			///// Création de l'objet carte 
+			
+			// Configuration de la carte :
+			let config = {
+  				minZoom: 7, // dézoomé
+  				maxZoom: 18, // zoomé
+			};
+			// 	Création de la carte (coordonnées de centrage et zoom)
+			var map = L.map('map',config).setView([43.70188, 2.13676], 8); 
+			
+			// Ajout de la fonctionnalité plein-écran
+			map.addControl(new L.Control.Fullscreen({
+    			title: {
+        			'false': 'Plein-écran',
+        			'true': 'Quitter plein-écran'
+    				}
+			}));
+
+            // --------------------------------------------------------------------------------------------------------------
+			///// Affichage du fond OpenStreetMap
+
+			var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+				maxZoom: 19,
+				attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+			}).addTo(map);
+
+			// --------------------------------------------------------------------------------------------------------------
+			/////  Couche bassin métropole
+
+			const bassin_metropole = L.geoJSON(null,{
+				color:'rgb(113,151,141)',
+				weight:2,
+				fill:false
+			});
+			$.getJSON('data/bassin_metropole.geojson', function(data){
+        	bassin_metropole.addData(data).addTo(map);
+        	});
+			
+			// --------------------------------------------------------------------------------------------------------------
+			///// Couche département
+
+			const departement = L.geoJSON(null,{
+				color:'rgb(108,188,165)',
+				weight:2,
+				fill:false
+			});
+			$.getJSON('data/dep_oc.geojson', function(data){
+        	departement.addData(data).addTo(map);
+        	});
+
+
+            // ----------------------------------------------------------------------------------------------------------------
+            ///// Couche AAC
+            /// Affichage de la couche aac (en 4326)
+            
+            /// Mise en forme de la couche 
+
+            // Style de la couche AAC
+			function style(feature) {
+    			return {
+    			    fillColor: '#6ba8ff',
+    			    weight: 2,
+    			    opacity: 1,
+    			    color: '#0687CF',
+    			    dashArray: '3', // motif de ligne : tiret
+    			    fillOpacity: 0.2
+    			};
+			};
+
+            // Changement du style lors du survol de l'aac
+			function highlightFeature(e) {
+    	
+                var layer = e.target;
+
+                layer.setStyle({
+                    weight: 5,
+                    color: '#003e6a',
+                    dashArray: '', // trait plein
+                    fillOpacity: 0.8,
+                });
+
+                if (!L.Browser.opera) {
+                    layer.bringToFront();
+                    };
+            };
+
+            // Réinitialisation du style lors de la fin du survol
+			function resetHighlight(e) {
+    			aac.resetStyle(e.target);
+
+				zp.bringToFront(); // mettre au premier plan les zp
+			};
+
+            // Option d'affichage du popup des acc
+            const customOptions = {
+                minWidth: 500, // largeur minimale
+                maxHeight: 300, // hauteur maximale
+                keepInView: false, // Vrai -> lorsqu'un popup est ouvert, celui-ci reste dans l'emprise visuelle de la carte
+			    zoomAnimation: false,
+			    closeOnClick: true,
+            };
+
+            // Tampon qui laisse un delai entre l'ouverture de deux popups afin que la mise en page onglet Tabby se fasse
+			function ouverture_popup(e) {
+				setTimeout(function() { zoomToFeature(e); }, 300); // variable temporelle à ajuster. Ici : 300 ms
+			};
+
+            // Zoom sur une commune et affichage du popup onglet lors du clic sur la carte
+			function zoomToFeature(e) {
+                // map.fitBounds(e.target.getBounds());
+				// map.closePopup();
+
+				// Actions sur panneau latéral
+				document.getElementById("search-shop").value = ""; // réinitialise la barre de recherche quand on clique sur une aac
+				resetActiveMenuItem(); // enlève la surbrillance sur les anciennes aac sélectionnées
+				removeActiveItem(); // réinitialise la barre de recherche
+
+				// Construction du texte html du popup
+                var point = turf.point([e.latlng.lng, e.latlng.lat]); // définition du point de clic
+                var content = '<ul data-tabs>';
+                var a= 0 ;
+                aac.eachLayer(function(layer) {
+                    var feature = layer.feature;
+					// Construction en-tête des onglets
+                    if (turf.booleanPointInPolygon(point, feature)) { // si l'aac intersecte le clic
+                        if (a===0){ // on définit le premier onglet comme celui qui va s'ouvrir par default - il faut que le champs identifiant commence par une lettre
+                            content += ('<li> <a data-tabby-default href="#' + feature.properties.ID_HTML + '">' + feature.properties.DONNEE_C_7 + '</a></li>');
+                            a += 1
+                        } else {
+                            content += ('<li> <a href="#' + feature.properties.ID_HTML + '">' + feature.properties.DONNEE_C_7 + '</a></li>')
+                            a += 1
+                        }
+                    };
+                });
+                content += '</ul>';
+				// Construction corps des onglets
+                aac.eachLayer(function(layer) {
+                    var feature = layer.feature;
+                    if (turf.booleanPointInPolygon(point, feature)) { // si l'aac intersecte le clic
+                        content += ('<div id="' + feature.properties.ID_HTML 
+							+ '"> </br> <p class="ouvrage"> OUVRAGE  </p> '
+							+ '<p class="nom_ouvrage"> ' + feature.properties.DONNEE_C_6 + '</p>'
+
+                    		+ `<p class="caracteristique"> <b> CARTE D'IDENTITÉ DE L'AAC </b> </p>`
+
+							+ `<span class="categorie"> DÉPARTEMENT </span></br>`
+							+ feature.properties.DONNEE_C_2
+                    		+ `</br></br> <span class="categorie"> CODE DE L'OUVRAGE </span></br>`
+							+ feature.properties.DONNEE_C_3
+                    		+ `</br></br> <span class="categorie"> REGROUPEMENT DES POINTS DE PRÉLÈVEMENT SENSIBLES PAR OUVRAGE </span></br>`
+							+ feature.properties.DONNEE_C_4
+                    		+ `</br></br> <span class="categorie"> NOM OFFICIEL DE L'ACC </span></br>`
+							+ feature.properties.DONNEE_C_5
+                    		+ `</br></br> <span class="categorie"> NOM DE L'OUVRAGE (SDAGE) </span></br>`
+							+ feature.properties.DONNEE_C_6
+                    		+ `</br></br> <span class="categorie"> NOM D'USAGE UTILISÉ PAR LE MAITRE D'OUVRAGE (DISTINCTION DES POINTS DE PRÉLÈVEMENT) </span></br>`
+							+ feature.properties.DONNEE_C_7
+                    		+ `</br></br> <span class="categorie"> ORIGINE DE LA RESSOURCE (SUPERFICIELLE ET/OU SOUTERRAINE) </span></br>`
+							+ feature.properties.DONNEE_C_8
+                    		+ `</br></br> <span class="categorie"> CAPTAGE PRIORITAIRE ? </span></br>`
+							+ feature.properties.DONNEE_C_9
+                    		+ `</br></br> <span class="categorie"> COMMUNE D'IMPLANTATION </span></br>`
+							+ feature.properties.DONNEE_C11
+                    		+ `</br></br> <span class="categorie"> CODE INSEE </span></br>`
+							+ feature.properties.DONNEE_C12
+                    		+ `</br></br> <span class="categorie"> MAITRE D'OUVRAGE DU CAPTAGE </span></br>`
+							+ feature.properties.DONNEE_C13
+                    		+ `</br></br> <span class="categorie"> NOMBRE DE COMMUNES INTERSECTÉES PAR L'ACC </span></br>`
+							+ feature.properties.DONNEE_C14
+                    		+ `</br></br> <span class="categorie"> SURFACE DE L'AAC (HA) </span></br>`
+							+ feature.properties.DONNEE_C15
+                    		+ `</br></br> <span class="categorie"> SURFACE DE LA SAU DE L'AAC (HA) </span></br>`
+							+ feature.properties.DONNEE_C16
+                    		+ `</br></br> <span class="categorie"> PROPORTION DE LA SAU/AAC (%) </span></br>`
+							+ feature.properties.DONNEE_C17
+                    		+ `</br></br> <span class="categorie"> PROPORTION ZPAAC/AAC (%) </span></br>`
+							+ feature.properties.DONNEE_C18
+                    		+ `</br></br> <span class="categorie"> POPULATION ALIMENTÉE PAR L'OUVRAGE (DILUTIONFait COMPRISE) </span></br>`
+							+ feature.properties.DONNEE_C19
+
+                    		+ `</br></br> <p class="demarche"> <b> DÉMARCHE DE PROTECTION ET D'ANIMATION </b> </p> </br>`
+
+                    		+ `<span class="categorie"> STATUT DE LA DÉMARCHE </span></br>`
+							+ feature.properties.DONNEE_C20
+                    		+ `</br></br> <span class="categorie"> STRUCTURE EN CHARGE DE L'ANIMATION </span></br>`
+							+ feature.properties.DONNEE_C21
+                    		+ `</br></br> <span class="categorie"> ANIMATRICE OU ANIMATEUR </span></br>`
+							+ feature.properties.DONNEE_C22
+                    		+ `</br></br> <span class="categorie"> ADRESSE COURRIEL </span></br>`
+							+ feature.properties.DONNEE_C23
+                    		+ `</br></br> <span class="categorie"> TEL. </span></br>`
+							+ feature.properties.DONNEE_C24
+                    		+ `</br></br> <span class="categorie"> ANNÉE DE DÉMARAGE DE L'ANIMATION </span></br>`
+							+ feature.properties.DONNEE_C25
+                    		+ `</br></br> <span class="categorie"> ANNÉE DE FIN DE L'ANIMATION </span></br>`
+							+ feature.properties.DONNEE_C26
+                    		+ `</br></br> <span class="categorie"> PÉRIODE DE L'ÉVALUATION </span></br>`
+							+ feature.properties.DONNEE_C27
+                    		+ `</br></br> <span class="categorie"> DÉLIMITATION DE LA ZONE DE PROTECTION (ZPAAC) : ARRÊTÉ PRÉFECTORAL EN APPLICATION ? </span></br>`
+							+ feature.properties.DONNEE_C28
+                    		+ `</br></br> <span class="categorie"> DATE D'ENTRÉE EN VIGUEUR DE L'ARRÊTÉ PRÉFECTORAL DE DÉLIMITATION ZPAAC </span></br>`
+							+ feature.properties.DONNEE_C29
+                    		+ `</br></br> <span class="categorie"> FIXATION DU PROGRAMME D'ACTIONS : ARRÊTÉ PRÉFECTORAL EN APPLICATION ? </span></br>`
+							+ feature.properties.DONNEE_C30
+                    		+ `</br></br> <span class="categorie"> DATE DE L'ARRÊTÉ PRÉFECTORAL RELATIF AU PROGRAMME D'ACTIONS </span></br>`
+							+ feature.properties.DONNEE_C31
+                    		+ `</br></br> <span class="categorie"> DÉCLARATION D'UTILITÉ PUBLIQUE (DUP) / ARRÊTÉ PRÉFECTORAL EN APPLICATION ? </span></br>`
+							+ feature.properties.DONNEE_C32
+                    		+ `</br></br> <span class="categorie"> DATE DE L'ADOPTION DE L'ARRÊTÉ DUP </span></br>`
+							+ feature.properties.DONNEE_C33
+
+                    		+ `</br> <p class="qualite"> <b> QUALITÉ DE LA RESSOURCE EN EAU </b> </p> </br>`
+
+                    		+ `<span class="categorie"> MISE EN PLACE D'UN RÉSEAU COMPLÉMENTAIRE DE SUIVI DE LA QUALITÉ DE L'EAU BRUTE PAR LE MAITRE D'OUVRAGE </span></br>`
+							+ feature.properties.DONNEE_C34
+                    		+ `</br></br> <span class="categorie"> RÉSEAU COMPLÉMENTAIRE OPÉRATIONNEL DEPUIS </span></br>`
+							+ feature.properties.DONNEE_C35
+                    		+ `</br></br> <span class="categorie"> QUALITÉ DE LA RESSOURCE EN EAU DU CAPTAGE </span></br>`
+							+ '<a href="' + feature.properties.DONNEE_C36 + '"> Rhône-Méditerranée EauFrance  </a>'        
+                    		+ `</br></br> <span class="categorie"> ÉXISTENCE D'UN ARRÊTÉ DE DÉROGATION AUX LIMITES DE QUALITÉDE L'EAU DU ROBINET EN APPLICATION POUR CE CAPTAGE </span></br>`
+							+ feature.properties.DONNEE_C45
+
+							+ `</br> <p class="plus_loin"> <b> POUR ALLER PLUS LOIN </b> </p> </br>`
+
+							+ `<a href=" https://aires-captages.fr/aires-alimentation-captages/carte-des-aac "> Carte des Aires d'alimentation de captage - OIEau </a>`
+
+                    		+ "</div>") ;
+
+							setActiveMenuItem(feature.properties.DONNEE_C_3); // ajout de la surbrillance sur le panneau latéral
+                    }
+                });
+				
+				// Affichage du popup
+                var popup = L.popup(customOptions) ; // affichage du popup avec ses options d'affichage
+                popup.setLatLng(e.latlng)
+                    .setContent(content)
+                    .openOn(map);
+
+				// chargement de la mise en page onglet par Tabby
+				const tabs = new Tabby("[data-tabs]");
+
+            };
+
+			// Fonction appliquée à chaque aac de la couche aac
+			function onEachFeature_aac(feature, layer) {
+    			
+                layer._leaflet_id = feature.properties.ID_HTML; // on désigne l'ID de la aac comme l'identifiant de l'entité
+                
+                layer.on({
+        			mouseover: highlightFeature, // action sur le survol
+        			mouseout: resetHighlight, // action sur la fin du survol
+        			click: ouverture_popup // action au clic
+    			});
+			};
+
+            // Ajout de la couche aac
+            const aac = L.geoJSON(null, {
+        	        style: style,
+					onEachFeature: onEachFeature_aac});
+			$.getJSON('data/AAC_complet_vf.geojson', function(data){
+        	aac.addData(data).addTo(map);
+        	});
+
+			// -----------------------------------------------------------------------
+			// Panneau latérale de navigation de la couche latérale
+
+			// Surbrillance de l'aac lors de sa sélection dans le panneau latérale
+			function highlightFeature_2(layer) {
+    	
+				layer.setStyle({
+					weight: 5,
+					color: '#003e6a',
+					dashArray: '', // trait plein
+					fillOpacity: 0.8
+				});
+
+				if (!L.Browser.opera) {
+					layer.bringToFront();
+					};
+			};
+
+			// Réinitialisation de la mise en forme suite à la sélection dans le panneau latéral
+			function resetHighlight_2(layer) {
+				aac.resetStyle(layer);
+			};
+
+			/// Fonction sur l'aac lors de sa sélection dans le panneau latéral
+			function zoomToFeature_2(layer,type) {
+                //map.flyToBounds(layer.getBounds());
+				map.fitBounds(layer.getBounds());
+				highlightFeature_2(layer); // mise en surbrillance
+				setTimeout(() => {resetHighlight_2(layer)},3000); // fin de la surbrillance après 3s
+ 
+				// Mise en forme du panneau latéral
+				document.getElementById("search-shop").value = "";
+				resetActiveMenuItem(); // enlève la surbrillance sur les anciennes aac sélectionnées
+				removeActiveItem();
+				setActiveMenuItem(layer.feature.properties.DONNEE_C_3,type);
+
+			}
+
+			/// Liste des ACC 
+			const aacListe = document.querySelector(".aac_liste");
+
+			/// Construction de la liste des AAC
+			fetch("data/AAC_complet_vf.geojson")
+  				.then((response) => response.json())
+  				.then((data) => {
+    				return data.features
+      					.sort(
+        					(a, b) =>
+								a.properties.DONNEE_C_2.localeCompare(b.properties.DONNEE_C_2) ||
+          						a.properties.DONNEE_C_3.localeCompare(b.properties.DONNEE_C_3)
+							)
+						// tri des AAC par département
+						.map((item, index, array) => {
+							const category =
+          						item.properties.DONNEE_C_2 !== array[index - 1]?.properties.DONNEE_C_2
+            						? `<li><h3 class="departement">${item.properties.DONNEE_C_2}</h3></li>`
+            						: "";
+
+        					const template = `
+								${category}
+          						<li class="aac_item" id="${item.properties.DONNEE_C_3}">
+            						<div class="name"><b>${item.properties.DONNEE_C_6}</b> - ${item.properties.DONNEE_C_5} (<i> ${item.properties.DONNEE_C11} </i>) </div>
+          						</li>
+        					`;
+					        return aacListe.insertAdjacentHTML("beforeend", template);
+      						});
+ 					})
+  					.then(() => {
+						// fonction appliquée à chaque AAC de la liste
+    					clickOnItem();
+  					});
+			
+					
+			// Fonction appliquée à chaque AAC de la liste
+			function clickOnItem() {
+  				const aacItems = document.querySelectorAll(".aac_item");
+  				aacItems.forEach((item) => {
+					// si on clique sur une aac de la liste
+    				item.addEventListener("click", (e) => {
+						// on récupère l'id de l'aac contenue dans <li id> 
+      					const id = e.target.closest(".aac_item").id;
+						console.log(id);
+      					aac.eachLayer(function (layer) {
+        					if (layer.feature.properties.DONNEE_C_3 == id) {
+								// on cherche l'aac correspondante dans la carte et on lui applique la fonction suivante :
+								zoomToFeature_2(layer,"lista");
+        					}
+      					});
+						
+    				});
+  				});
+			}
+			
+			// Autocomplétion de la barre de recherche
+			function searchText() {
+  				const input = document.getElementById("search-shop");
+  				const filter = input.value.toUpperCase();
+  				const lists = document.querySelectorAll(".aac_liste > li");
+  				const category = document.querySelectorAll(".departement-category");
+
+  				console.log("input", input);
+                console.log("filter", filter);
+                console.log("lists", lists);
+                console.log("category", category);
+
+  				for (i = 0; i < lists.length; i++) {
+    				item = lists[i].textContent;
+    				className = lists[i].className;
+                    console.log(item);
+                    console.log(className);
+
+    				if (item.toUpperCase().indexOf(filter) > -1) {
+      					lists[i].style.display = "";
+    				} else {
+      					lists[i].style.display = "none";
+    				}
+  				}
+
+				// cache les département dans la liste des possibilité dès la deuxième lettre
+  				if (filter.length >= 1) {
+    				category.forEach((el) => {
+      					el.parentNode.style.display = "none";
+    				});
+  				}
+			}
+
+			// Mise en place de la recherche avec autocomplétion.
+  			const search = document.getElementById("search-shop");
+  			search.addEventListener("input", searchText);
+
+			// Enlève la surbrillance sur l'ancienne aac sélectionnée dans le menu
+			function resetActiveMenuItem (){
+				const lists = document.querySelectorAll(".aac_liste > li");
+  				const array = [].slice.call(lists);
+			
+				array.forEach((item) => {
+    				item.classList.remove("active-shop");
+  				});
+			}
+			
+			// Mets la surbrillance sur les aac sélectionnées
+			function setActiveMenuItem(id) {
+  				const lists = document.querySelectorAll(".aac_liste > li");
+  				const array = [].slice.call(lists);
+
+  				const item = array.find((item) => item.id== id);
+				
+				// Ajoute la surbrillance sur la nouvelle aac sélectionnée dans le menu
+  				item.classList.add("active-shop");
+				
+  				// scroll to element
+  				const ulElement = document.querySelector(".aac_liste");
+  				ulElement.scrollTo(0, item.offsetTop - ulElement.offsetTop);
+			}
+
+			// Réinitialise la liste d'autocomplétion
+			function removeActiveItem() {
+  				const lists = document.querySelectorAll(".aac_liste > li");
+  				const array = [].slice.call(lists);
+				// console.log('_____');
+  				array.forEach((item) => {
+    				item.removeAttribute("style");
+ 				 });
+			}
+
+
+			// --------------------------------------------------------------------------------------------------------------
+			///// Ajout de la couche zone protégée
+
+			const zp = L.geoJSON(null,{
+				color:'#ffaf3b',
+				weight:2,
+				fill:false
+			});
+			$.getJSON('data/zp_complet.geojson', function(data){
+        	zp.addData(data).addTo(map);
+        	});
+
+			zp.bringToFront(); // mettre au premier plan les zp
+
+
+			// --------------------------------------------------------------------------------------------------------
+			///// Légende
+
+			var legend = L.control({position: 'bottomright'});
+
+			legend.onAdd = function (map) {
+				var div = L.DomUtil.create('div', 'info legend'),
+					grades=[ 'AAC', 'Zone protégée', 'Département', 'Bassin versant'],
+					labels = [];
+				
+				div.innerHTML += '<i style="border: 2px #0687cf dashed; background: #bed9ff; opacity: 1"></i> AAC <br>';
+				div.innerHTML += `<i style="border: 2px #ffaf3b solid";></i> Zone de protection de l'AAC (ZPAAC) <br>`;
+				div.innerHTML += '<i style="border: 2px rgb(108,188,165) solid";></i> Département <br>';	
+				div.innerHTML += '<i style="border: 2px rgb(113,151,141) solid";></i> Bassin versant <br>';
+
+				return div;
+			};
+
+			legend.addTo(map);
+
+
+            // --------------------------------------------------------------------------------------------------------
+			///// Sélectionneur de couches
+
+			// Une parmi plusieurs
+			// var baseMaps = {
+			// 	"OpenStreetMap": osm,
+			// 	"IGN": ortho,
+			// };
+
+			// // Couches à cocher
+			// var groupOverlayMaps = {
+			// 		"Captages" : {
+			// 			"AAC" : aac,
+			// 			"Bassin métrople":bassin_metropole},
+			// 		"ZP" : {
+			// 			"Zone protégée":zp
+			// 		}
+            //     };
+			
+			// // Ajout du contrôle des couches : pour l'instant controle simple
+            // //var layerControl = L.control.layers(baseMaps, groupOverlayMaps).addTo(map);
+			// var layerControl = L.control.groupedLayers(baseMaps, groupOverlayMaps,{position: 'topright'}).addTo(map);
+
+			
+			map.whenReady(chargement_carte); // une fois la carte chargee, on efface l'icone de chargement
+        
+		});
+
+			
+    </script>
+
+
+</body>
+</html>
