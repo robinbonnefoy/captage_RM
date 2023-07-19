@@ -47,6 +47,7 @@
     <!-- Autocomplétion sur plusieurs champs-->
     <script src="https://cdn.jsdelivr.net/npm/autocomplete.js@0.38.0/dist/autocomplete.min.js"></script>
 
+
 </head>
 
 <body>
@@ -131,6 +132,7 @@
 			$.getJSON('data/dep_oc.geojson', function(data){
         	departement.addData(data).addTo(map);
         	});
+
 
 
             // ----------------------------------------------------------------------------------------------------------------
@@ -345,6 +347,7 @@
         	aac.addData(data).addTo(map);
         	});
 
+
 			// -----------------------------------------------------------------------
 			// Panneau latérale de navigation de la couche latérale
 
@@ -426,7 +429,7 @@
     				item.addEventListener("click", (e) => {
 						// on récupère l'id de l'aac contenue dans <li id> 
       					const id = e.target.closest(".aac_item").id;
-						console.log(id);
+						//console.log(id);
       					aac.eachLayer(function (layer) {
         					if (layer.feature.properties.ID_HTML == id) {
 								// on cherche l'aac correspondante dans la carte et on lui applique la fonction suivante :
@@ -445,16 +448,9 @@
   				const lists = document.querySelectorAll(".aac_liste > li");
   				const category = document.querySelectorAll(".departement-category");
 
-  				console.log("input", input);
-                console.log("filter", filter);
-                console.log("lists", lists);
-                console.log("category", category);
-
   				for (i = 0; i < lists.length; i++) {
     				item = lists[i].textContent;
     				className = lists[i].className;
-                    console.log(item);
-                    console.log(className);
 
     				if (item.toUpperCase().indexOf(filter) > -1) {
       					lists[i].style.display = "";
@@ -491,7 +487,7 @@
   				const array = [].slice.call(lists);
 
   				const item = array.find((item) => item.id== id);
-				console.log(id);
+				//console.log(id);
 				
 				// Ajoute la surbrillance sur la nouvelle aac sélectionnée dans le menu
   				item.classList.add("active-shop");
@@ -511,6 +507,44 @@
  				 });
 			}
 
+			// --------------------------------------------------------------------------------------------------------------
+			///// Couche captages_prioritaires
+
+			var geojsonMarkerOptions = {
+    			radius: 4,
+    			fillColor: "#3CBAF2",
+    			color: "#ffffff",
+    			weight: 1,
+    			opacity: 1,
+    			fillOpacity: 0.8,
+				interactive: false, 
+			};
+
+			const captages = L.geoJSON(null,{
+				pointToLayer : function (feature, latlng) { return L.circleMarker(latlng, geojsonMarkerOptions );},
+			});
+
+			// Gestion de l'affichage en fonction de l'échelle
+			function updateGeoJSONLayerVisibility() {
+			  if (map.getZoom() < 13) {
+			    if (!map.hasLayer(captages)) {
+			      map.addLayer(captages);
+			    }
+			  } else {
+			    if (map.hasLayer(captages)) {
+			      map.removeLayer(captages);
+			    }
+			  }
+			}
+
+			$.getJSON('data/captages_prio.geojson', function(data){
+        	captages.addData(data).addTo(map);
+			updateGeoJSONLayerVisibility();
+        	});
+			
+			map.on('zoomend', updateGeoJSONLayerVisibility);
+
+			//console.log(captages);
 
 			// --------------------------------------------------------------------------------------------------------------
 			///// Ajout de la couche zone protégée
@@ -534,9 +568,10 @@
 
 			legend.onAdd = function (map) {
 				var div = L.DomUtil.create('div', 'info legend'),
-					grades=[ 'AAC', 'Zone protégée', 'Département', 'Bassin versant'],
+					grades=[ 'Captages prioritaires', 'AAC', 'Zone protégée', 'Département', 'Bassin versant'],
 					labels = [];
 				
+				div.innerHTML += '<i style="border: 2px #ffffff solid; background: #3cbafe; opacity: 1; border-radius : 50%; height: 6px; width: 6px; margin-top: 6px; margin-left: 6px"></i>   Captages prioritaires <br>';
 				div.innerHTML += '<i style="border: 2px #0687cf dashed; background: #bed9ff; opacity: 1"></i> AAC <br>';
 				div.innerHTML += `<i style="border: 2px #ffaf3b solid";></i> Zone de protection de l'AAC (ZPAAC) <br>`;
 				div.innerHTML += '<i style="border: 2px rgb(108,188,165) solid";></i> Département <br>';	
