@@ -1,5 +1,4 @@
-<!-- Carte Captage avec navigation des AAC avec un panneau latérale 
-	Inspiration de https://tomik23.github.io/leaflet-examples/#52.full-project -->
+<!-- Carto'Captages bassin RMC avec navigation des AAC avec un panneau latérale -->
 
 <!doctype html>
 <html lang="fr">
@@ -7,10 +6,10 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="author" content="Robin BONNEFOY">
-	<meta name="description" content="Maquette cartographie web captage">
+	<meta name="description" content="Carto'Captages bassin RMC">
 
 
-	<title>Carte captage bassin Rhône Méditerranée Corse </title>
+	<title> Carto'Captages bassin RMC </title>
   
 	<!-- Ressources Leaflet -->
 	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.2/dist/leaflet.css"
@@ -46,7 +45,6 @@
 
     <!-- Autocomplétion sur plusieurs champs-->
     <script src="https://cdn.jsdelivr.net/npm/autocomplete.js@0.38.0/dist/autocomplete.min.js"></script>
-
 
 </head>
 
@@ -104,7 +102,7 @@
             // --------------------------------------------------------------------------------------------------------------
 			///// Affichage du fond OpenStreetMap
 
-			var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+			var osm = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
 				maxZoom: 19,
 				attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 			}).addTo(map);
@@ -342,7 +340,8 @@
             // Ajout de la couche aac
             const aac = L.geoJSON(null, {
         	        style: style,
-					onEachFeature: onEachFeature_aac});
+					onEachFeature: onEachFeature_aac,
+					attribution: ' | Mis à jour le 31/07/2023'});
 			$.getJSON('data/AAC_complet_vf.geojson', function(data){
         	aac.addData(data).addTo(map);
         	});
